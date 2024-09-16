@@ -11,6 +11,7 @@ class RibbonTrail {
         this.endWidth = endWidth;
         this.growthRate = growthRate;
         this.points = [];
+        this.quadPoints = [];
         this.quat = glMatrix.quat.create();
         this.position = glMatrix.vec3.create();
     }
@@ -19,74 +20,86 @@ class RibbonTrail {
         glMatrix.vec3.copy(this.position, position);
         glMatrix.quat.copy(this.quat, rotation);
 
-        this.points.unshift({ pos: [...this.position], quat: [...this.quat] });
+        const newPoint = { pos: [...this.position], quat: [...this.quat] };
+        this.points.unshift(newPoint);
         if (this.points.length > this.maxPoints) {
-            this.points.length = this.maxPoints;
+            this.points.pop();
+        }
+
+        // Calculate new head point
+        const width = this.startWidth;
+        const halfWidth = width / 2;
+        const right = glMatrix.vec3.create();
+        glMatrix.vec3.transformQuat(right, [halfWidth, 0, 0], this.quat);
+
+        const v1 = glMatrix.vec3.subtract(
+            glMatrix.vec3.create(),
+            this.position,
+            right
+        );
+        const v2 = glMatrix.vec3.add(
+            glMatrix.vec3.create(),
+            this.position,
+            right
+        );
+
+        // Add new quad points at the beginning
+        this.quadPoints.unshift([v1, v2]);
+        if (this.quadPoints.length > this.maxPoints) {
+            this.quadPoints.pop();
+        }
+
+        // Update the last point if needed
+        if (this.quadPoints.length > 1) {
+            const lastIndex = this.quadPoints.length - 1;
+            const t = lastIndex / (this.maxPoints - 1);
+            const width = this.endWidth * (1 - t) + this.startWidth * t;
+            const halfWidth = width / 2;
+            const lastPoint = this.points[lastIndex];
+            const right = glMatrix.vec3.create();
+            glMatrix.vec3.transformQuat(
+                right,
+                [halfWidth, 0, 0],
+                lastPoint.quat
+            );
+
+            const v3 = glMatrix.vec3.subtract(
+                glMatrix.vec3.create(),
+                lastPoint.pos,
+                right
+            );
+            const v4 = glMatrix.vec3.add(
+                glMatrix.vec3.create(),
+                lastPoint.pos,
+                right
+            );
+            this.quadPoints[lastIndex] = [v3, v4];
         }
     }
 
     render(renderer, rcTex) {
         const pointCount = Math.min(
-            this.points.length,
+            this.quadPoints.length,
             Math.floor(this.growthRate * this.maxPoints)
         );
-
-        console.log(pointCount, this.points);
 
         const rcSeg = rcTex.clone();
 
         for (let i = 0; i < pointCount - 1; i++) {
-            debugger;
             const t = i / (pointCount - 1);
             const t1 = (i + 1) / (pointCount - 1);
-            const width1 = this.endWidth * (1 - t) + this.startWidth * t;
-            const width2 =
-                this.endWidth * (1 - (t + 1 / (pointCount - 1))) +
-                this.startWidth * (t + 1 / (pointCount - 1));
-            const halfWidth1 = width1 / 2;
-            const halfWidth2 = width2 / 2;
 
-            const p1 = this.points[i];
-            const p2 = this.points[i + 1];
-
-            const right1 = glMatrix.vec3.create();
-            const right2 = glMatrix.vec3.create();
-            glMatrix.vec3.transformQuat(right1, [halfWidth1, 0, 0], p1.quat);
-            glMatrix.vec3.transformQuat(right2, [halfWidth2, 0, 0], p2.quat);
-
-            const v1 = glMatrix.vec3.subtract(
-                glMatrix.vec3.create(),
-                p1.pos,
-                right1
-            );
-            const v2 = glMatrix.vec3.add(
-                glMatrix.vec3.create(),
-                p1.pos,
-                right1
-            );
-            const v3 = glMatrix.vec3.subtract(
-                glMatrix.vec3.create(),
-                p2.pos,
-                right2
-            );
-            const v4 = glMatrix.vec3.add(
-                glMatrix.vec3.create(),
-                p2.pos,
-                right2
-            );
+            const [v1, v2] = this.quadPoints[i];
+            const [v3, v4] = this.quadPoints[i + 1];
 
             const rcWidth = rcTex.getRight() - rcTex.getLeft();
             const left = rcTex.getLeft() + t * rcWidth;
             const right = left + t1 * rcWidth;
-            // rcSeg.setLeft(left);
-            // rcSeg.setRight(right);
             const rcHeight = rcTex.getBottom() - rcTex.getTop();
             const top = rcTex.getTop() + t * rcHeight;
             const bottom = rcTex.getTop() + t1 * rcHeight;
             rcSeg.setTop(top);
             rcSeg.setBottom(bottom);
-
-            console.log("Top:", top, "Bottom:", bottom);
 
             renderer.Quad3D(
                 v1[0],
