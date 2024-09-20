@@ -88,6 +88,29 @@ class RibbonTrail {
             );
         }
     }
+
+    getBoundingBox() {
+        if (this.quadPoints.length === 0) {
+            return null; // No points to calculate bounding box
+        }
+        let minX = Infinity,
+            minY = Infinity,
+            minZ = Infinity;
+        let maxX = -Infinity,
+            maxY = -Infinity,
+            maxZ = -Infinity;
+
+        for (const [v1, v2] of this.quadPoints) {
+            minX = Math.min(minX, v1[0], v2[0]);
+            minY = Math.min(minY, v1[1], v2[1]);
+            minZ = Math.min(minZ, v1[2], v2[2]);
+            maxX = Math.max(maxX, v1[0], v2[0]);
+            maxY = Math.max(maxY, v1[1], v2[1]);
+            maxZ = Math.max(maxZ, v1[2], v2[2]);
+        }
+
+        return { minX, minY, minZ, maxX, maxY, maxZ };
+    }
 }
 
 function getInstanceJs(parentClass, scriptInterface, addonTriggers, C3) {
@@ -122,7 +145,6 @@ function getInstanceJs(parentClass, scriptInterface, addonTriggers, C3) {
             // @ts-ignore
             const glMatrix = globalThis.glMatrix;
             const vec3 = glMatrix.vec3;
-            const quat = glMatrix.quat;
             const wi = this._inst.GetWorldInfo();
             const x = wi.GetX();
             const y = wi.GetY();
@@ -131,8 +153,16 @@ function getInstanceJs(parentClass, scriptInterface, addonTriggers, C3) {
             if (this.ribbon) {
                 this.ribbon.update(pos, this.quaternion);
                 this.ribbon.render(renderer, rcTex, z);
+                const bb = this.ribbon.getBoundingBox();
+                if (bb) {
+                    const width = bb.maxX - bb.minX;
+                    const height = bb.maxY - bb.minY;
+                    wi.SetSize(width, height);
+                    wi.SetOriginX(-(bb.minX - x) / width);
+                    wi.SetOriginY(-(bb.minY - y) / height);
+                    wi.SetDepth(bb.maxZ - bb.minZ);
+                }
             }
-            wi.SetBboxChanged();
         }
 
         _UpdateQuaternion(quaternion) {
