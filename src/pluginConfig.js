@@ -4,7 +4,7 @@ const Config = {
     addonType: "plugin",
     id: "mikal_ribbon",
     name: "ribbon",
-    version: "1.0.1",
+    version: "1.0.2",
     category: "3d",
     author: "mikal",
     website: "https://www.construct.net",

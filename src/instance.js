@@ -48,36 +48,9 @@ class RibbonTrail {
         if (this.quadPoints.length > this.maxPoints) {
             this.quadPoints.pop();
         }
-
-        // Update the last point if needed
-        if (this.quadPoints.length > 1) {
-            const lastIndex = this.quadPoints.length - 1;
-            const t = lastIndex / (this.maxPoints - 1);
-            const width = this.endWidth * (1 - t) + this.startWidth * t;
-            const halfWidth = width / 2;
-            const lastPoint = this.points[lastIndex];
-            const right = glMatrix.vec3.create();
-            glMatrix.vec3.transformQuat(
-                right,
-                [halfWidth, 0, 0],
-                lastPoint.quat
-            );
-
-            const v3 = glMatrix.vec3.subtract(
-                glMatrix.vec3.create(),
-                lastPoint.pos,
-                right
-            );
-            const v4 = glMatrix.vec3.add(
-                glMatrix.vec3.create(),
-                lastPoint.pos,
-                right
-            );
-            this.quadPoints[lastIndex] = [v3, v4];
-        }
     }
 
-    render(renderer, rcTex) {
+    render(renderer, rcTex, z) {
         const pointCount = Math.min(
             this.quadPoints.length,
             Math.floor(this.growthRate * this.maxPoints)
@@ -92,9 +65,6 @@ class RibbonTrail {
             const [v1, v2] = this.quadPoints[i];
             const [v3, v4] = this.quadPoints[i + 1];
 
-            const rcWidth = rcTex.getRight() - rcTex.getLeft();
-            const left = rcTex.getLeft() + t * rcWidth;
-            const right = left + t1 * rcWidth;
             const rcHeight = rcTex.getBottom() - rcTex.getTop();
             const top = rcTex.getTop() + t * rcHeight;
             const bottom = rcTex.getTop() + t1 * rcHeight;
@@ -104,16 +74,16 @@ class RibbonTrail {
             renderer.Quad3D(
                 v1[0],
                 v1[1],
-                v1[2],
+                v1[2] - z,
                 v2[0],
                 v2[1],
-                v2[2],
+                v2[2] - z,
                 v4[0],
                 v4[1],
-                v4[2],
+                v4[2] - z,
                 v3[0],
                 v3[1],
-                v3[2],
+                v3[2] - z,
                 rcSeg
             );
         }
@@ -160,8 +130,9 @@ function getInstanceJs(parentClass, scriptInterface, addonTriggers, C3) {
             const pos = vec3.fromValues(x, y, z);
             if (this.ribbon) {
                 this.ribbon.update(pos, this.quaternion);
-                this.ribbon.render(renderer, rcTex);
+                this.ribbon.render(renderer, rcTex, z);
             }
+            wi.SetBboxChanged();
         }
 
         _UpdateQuaternion(quaternion) {
